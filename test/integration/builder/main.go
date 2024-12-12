@@ -18,18 +18,13 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
-	"strings"
 
-	"github.com/emicklei/go-restful"
 	builderv2 "k8s.io/kube-openapi/pkg/builder"
-	"k8s.io/kube-openapi/pkg/common"
-	"k8s.io/kube-openapi/pkg/util"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/test/integration/pkg/generated"
+	"k8s.io/kube-openapi/test/integration/testutil"
 )
 
 // TODO: Change this to output the generated swagger to stdout.
@@ -47,17 +42,17 @@ func main() {
 	// from GetOpenAPIDefinitions. Anonymous function returning empty
 	// Ref is not used.
 	var defNames []string
-	for name, _ := range generated.GetOpenAPIDefinitions(func(name string) spec.Ref {
+	for name := range generated.GetOpenAPIDefinitions(func(name string) spec.Ref {
 		return spec.Ref{}
 	}) {
 		defNames = append(defNames, name)
 	}
 
 	// Create a minimal builder config, then call the builder with the definition names.
-	config := createOpenAPIBuilderConfig()
+	config := testutil.CreateOpenAPIBuilderConfig()
 	config.GetDefinitions = generated.GetOpenAPIDefinitions
 	// Build the Paths using a simple WebService for the final spec
-	swagger, serr := builderv2.BuildOpenAPISpec(createWebServices(), config)
+	swagger, serr := builderv2.BuildOpenAPISpec(testutil.CreateWebServices(true), config)
 	if serr != nil {
 		log.Fatalf("ERROR: %s", serr.Error())
 	}
@@ -67,81 +62,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("json marshal error: %s", err.Error())
 	}
-	err = ioutil.WriteFile(swaggerFilename, specBytes, 0644)
+	err = os.WriteFile(swaggerFilename, specBytes, 0644)
 	if err != nil {
 		log.Fatalf("stdout write error: %s", err.Error())
 	}
-}
-
-// CreateOpenAPIBuilderConfig hard-codes some values in the API builder
-// config for testing.
-func createOpenAPIBuilderConfig() *common.Config {
-	return &common.Config{
-		ProtocolList:   []string{"https"},
-		IgnorePrefixes: []string{"/swaggerapi"},
-		Info: &spec.Info{
-			InfoProps: spec.InfoProps{
-				Title:   "Integration Test",
-				Version: "1.0",
-			},
-		},
-		ResponseDefinitions: map[string]spec.Response{
-			"NotFound": spec.Response{
-				ResponseProps: spec.ResponseProps{
-					Description: "Entity not found.",
-				},
-			},
-		},
-		CommonResponses: map[int]spec.Response{
-			404: *spec.ResponseRef("#/responses/NotFound"),
-		},
-	}
-}
-
-// createWebServices hard-codes a simple WebService which only defines a GET path
-// for testing.
-func createWebServices() []*restful.WebService {
-	w := new(restful.WebService)
-	w.Route(buildRouteForType(w, "dummytype", "Foo"))
-	w.Route(buildRouteForType(w, "dummytype", "Bar"))
-	w.Route(buildRouteForType(w, "dummytype", "Baz"))
-	w.Route(buildRouteForType(w, "dummytype", "Waldo"))
-	w.Route(buildRouteForType(w, "listtype", "AtomicList"))
-	w.Route(buildRouteForType(w, "listtype", "MapList"))
-	w.Route(buildRouteForType(w, "listtype", "SetList"))
-	w.Route(buildRouteForType(w, "uniontype", "TopLevelUnion"))
-	w.Route(buildRouteForType(w, "uniontype", "InlinedUnion"))
-	w.Route(buildRouteForType(w, "custom", "Bal"))
-	w.Route(buildRouteForType(w, "custom", "Bak"))
-	w.Route(buildRouteForType(w, "custom", "Bac"))
-	w.Route(buildRouteForType(w, "custom", "Bah"))
-	w.Route(buildRouteForType(w, "maptype", "GranularMap"))
-	w.Route(buildRouteForType(w, "maptype", "AtomicMap"))
-	w.Route(buildRouteForType(w, "structtype", "GranularStruct"))
-	w.Route(buildRouteForType(w, "structtype", "AtomicStruct"))
-	w.Route(buildRouteForType(w, "structtype", "DeclaredAtomicStruct"))
-	w.Route(buildRouteForType(w, "defaults", "Defaulted"))
-	return []*restful.WebService{w}
-}
-
-// Implements OpenAPICanonicalTypeNamer
-var _ = util.OpenAPICanonicalTypeNamer(&typeNamer{})
-
-type typeNamer struct {
-	pkg  string
-	name string
-}
-
-func (t *typeNamer) OpenAPICanonicalTypeName() string {
-	return fmt.Sprintf("k8s.io/kube-openapi/test/integration/testdata/%s.%s", t.pkg, t.name)
-}
-
-func buildRouteForType(ws *restful.WebService, pkg, name string) *restful.RouteBuilder {
-	namer := typeNamer{
-		pkg:  pkg,
-		name: name,
-	}
-	return ws.GET(fmt.Sprintf("test/%s/%s", pkg, strings.ToLower(name))).
-		To(func(*restful.Request, *restful.Response) {}).
-		Writes(&namer)
 }

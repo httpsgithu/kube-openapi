@@ -19,6 +19,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	jsontesting "k8s.io/kube-openapi/pkg/util/jsontesting"
 )
 
 var paths = Paths{
@@ -31,13 +33,51 @@ var paths = Paths{
 }
 
 const pathsJSON = `{"x-framework":"go-swagger","/":{"$ref":"cats"}}`
+const pathsJSONInvalidKey = `{"x-framework":"go-swagger","not-path-nor-extension":"invalid","/":{"$ref":"cats"}}`
 
 func TestIntegrationPaths(t *testing.T) {
 	var actual Paths
 	if assert.NoError(t, json.Unmarshal([]byte(pathsJSON), &actual)) {
 		assert.EqualValues(t, actual, paths)
 	}
+	if assert.NoError(t, json.Unmarshal([]byte(pathsJSONInvalidKey), &actual)) {
+		assert.EqualValues(t, actual, paths)
+	}
 
 	assertParsesJSON(t, pathsJSON, paths)
+	assertParsesJSON(t, pathsJSONInvalidKey, paths)
+}
 
+func TestPathsRoundtrip(t *testing.T) {
+	cases := []jsontesting.RoundTripTestCase{
+		{
+			// Show at least one field from each embededd struct sitll allows
+			// roundtrips successfully
+			Name: "UnmarshalEmbedded",
+			JSON: `{
+				"x-framework": "swagger-go",
+				"/this-is-a-path": {
+					"$ref": "/components/a/path/item"
+				}
+			  }`,
+			Object: &Paths{
+				VendorExtensible{Extensions{
+					"x-framework": "swagger-go",
+				}},
+				map[string]PathItem{
+					"/this-is-a-path": {Refable: Refable{MustCreateRef("/components/a/path/item")}},
+				},
+			},
+		}, {
+			Name:   "BasicCase",
+			JSON:   pathsJSON,
+			Object: &paths,
+		},
+	}
+
+	for _, tcase := range cases {
+		t.Run(tcase.Name, func(t *testing.T) {
+			require.NoError(t, tcase.RoundTripTest(&Paths{}))
+		})
+	}
 }

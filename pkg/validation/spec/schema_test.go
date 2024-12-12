@@ -19,12 +19,15 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	jsontesting "k8s.io/kube-openapi/pkg/util/jsontesting"
 )
 
 var schema = Schema{
 	VendorExtensible: VendorExtensible{Extensions: map[string]interface{}{"x-framework": "go-swagger"}},
 	SchemaProps: SchemaProps{
 		Ref:              MustCreateRef("Cat"),
+		Schema:           "schemaURL",
 		Type:             []string{"string"},
 		Format:           "date",
 		Description:      "the description of this schema",
@@ -79,6 +82,7 @@ var schema = Schema{
 var schemaJSON = `{
 	"x-framework": "go-swagger",
   "$ref": "Cat",
+  "$schema": "schemaURL",
   "description": "the description of this schema",
   "maximum": 100,
   "minimum": 5,
@@ -153,6 +157,7 @@ func TestSchema(t *testing.T) {
 	actual2 := Schema{}
 	if assert.NoError(t, json.Unmarshal([]byte(schemaJSON), &actual2)) {
 		assert.Equal(t, schema.Ref, actual2.Ref)
+		assert.Equal(t, schema.Schema, actual2.Schema)
 		assert.Equal(t, schema.Description, actual2.Description)
 		assert.Equal(t, schema.Maximum, actual2.Maximum)
 		assert.Equal(t, schema.Minimum, actual2.Minimum)
@@ -193,6 +198,43 @@ func TestSchema(t *testing.T) {
 		assert.Equal(t, exp2["name"], ex2["name"])
 	}
 
+}
+
+func TestSchemaRoundtrip(t *testing.T) {
+	cases := []jsontesting.RoundTripTestCase{
+		{
+			// Show at least one field from each embededd struct sitll allows
+			// roundtrips successfully
+			Name: "UnmarshalEmbedded",
+			Object: &Schema{
+				VendorExtensible{Extensions: Extensions{
+					"x-framework": "go-swagger",
+				}},
+				SchemaProps{
+					Description: "this is a description",
+				},
+				SwaggerSchemaProps{
+					Example: "this is an example",
+				},
+				map[string]interface{}{
+					"unknown/prop": "test prop",
+				},
+			},
+		},
+		// Can't add this case due to map[string]interface{} unmarshaling
+		// numbers unconditionally into float. But schema uses ints
+		// {
+		// 	Name:   "BasicCase",
+		// 	JSON:   schemaJSON,
+		// 	Object: &schema,
+		// },
+	}
+
+	for _, tcase := range cases {
+		t.Run(tcase.Name, func(t *testing.T) {
+			require.NoError(t, tcase.RoundTripTest(&Schema{}))
+		})
+	}
 }
 
 func BenchmarkSchemaUnmarshal(b *testing.B) {

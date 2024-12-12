@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/types"
 )
 
 func TestOmitEmptyMatchCase(t *testing.T) {
@@ -37,7 +37,7 @@ func TestOmitEmptyMatchCase(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "PodSpec",
 						Tags: `json:"podSpec"`,
 					},
@@ -50,7 +50,7 @@ func TestOmitEmptyMatchCase(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "PodSpec",
 						Tags: `json:"-,inline"`,
 					},
@@ -63,7 +63,7 @@ func TestOmitEmptyMatchCase(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "OmitEmpty",
 						Tags: `json:"omitEmpty,inline"`,
 					},
@@ -76,7 +76,7 @@ func TestOmitEmptyMatchCase(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "PodSpec",
 						Tags: `json:"podSpec,omitempty"`,
 					},
@@ -89,7 +89,7 @@ func TestOmitEmptyMatchCase(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "PodSpec",
 						Tags: `json:"podSpec,omitEmpty"`,
 					},

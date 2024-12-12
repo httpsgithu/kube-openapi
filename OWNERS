@@ -7,10 +7,14 @@ reviewers:
 - roycaihw
 - sttts
 - jpbetz
+- jefftree
+- alexzielenski
 approvers:
-- lavalamp
 - sttts
 - apelisse
 - jpbetz
-emritus_approvers:
+- jefftree
+- alexzielenski
+emeritus_approvers:
 - mbohlool
+- lavalamp

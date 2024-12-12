@@ -23,9 +23,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/emicklei/go-restful"
+	"github.com/emicklei/go-restful/v3"
 	"github.com/stretchr/testify/assert"
+
 	openapi "k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/util/jsontesting"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -215,18 +217,10 @@ func getConfig(fullMethods bool) (*openapi.Config, *restful.Container) {
 				"k8s.io/kube-openapi/pkg/builder.TestInput":             *TestInput{}.OpenAPIDefinition(),
 				"k8s.io/kube-openapi/pkg/builder.TestOutput":            *TestOutput{}.OpenAPIDefinition(),
 				"k8s.io/kube-openapi/pkg/builder.TestExtensionV2Schema": *TestExtensionV2Schema{}.OpenAPIDefinition(),
-				// Bazel changes the package name, this is ok for testing, but we need to fix it if it happened
-				// in the main code.
-				"k8s.io/kube-openapi/pkg/builder/go_default_test.TestInput":             *TestInput{}.OpenAPIDefinition(),
-				"k8s.io/kube-openapi/pkg/builder/go_default_test.TestOutput":            *TestOutput{}.OpenAPIDefinition(),
-				"k8s.io/kube-openapi/pkg/builder/go_default_test.TestExtensionV2Schema": *TestExtensionV2Schema{}.OpenAPIDefinition(),
 			}
 		},
 		GetDefinitionName: func(name string) (string, spec.Extensions) {
 			friendlyName := name[strings.LastIndex(name, "/")+1:]
-			if strings.HasPrefix(friendlyName, "go_default_test") {
-				friendlyName = "builder" + friendlyName[len("go_default_test"):]
-			}
 			return friendlyName, spec.Extensions{"x-test2": "test2"}
 		},
 	}, container
@@ -297,30 +291,13 @@ func getTestResponses() *spec.Responses {
 func getTestCommonParameters() []spec.Parameter {
 	ret := make([]spec.Parameter, 2)
 	ret[0] = spec.Parameter{
-		SimpleSchema: spec.SimpleSchema{
-			Type: "string",
-		},
-		ParamProps: spec.ParamProps{
-			Description: "path to the resource",
-			Name:        "path",
-			In:          "path",
-			Required:    true,
-		},
-		CommonValidations: spec.CommonValidations{
-			UniqueItems: true,
+		Refable: spec.Refable{
+			Ref: spec.MustCreateRef("#/parameters/path-z6Ciiujn"),
 		},
 	}
 	ret[1] = spec.Parameter{
-		SimpleSchema: spec.SimpleSchema{
-			Type: "string",
-		},
-		ParamProps: spec.ParamProps{
-			Description: "If 'true', then the output is pretty printed.",
-			Name:        "pretty",
-			In:          "query",
-		},
-		CommonValidations: spec.CommonValidations{
-			UniqueItems: true,
+		Refable: spec.Refable{
+			Ref: spec.MustCreateRef("#/parameters/pretty-nN7o5FEq"),
 		},
 	}
 	return ret
@@ -330,8 +307,8 @@ func getTestParameters() []spec.Parameter {
 	ret := make([]spec.Parameter, 1)
 	ret[0] = spec.Parameter{
 		ParamProps: spec.ParamProps{
-			Name:     "body",
 			In:       "body",
+			Name:     "body",
 			Required: true,
 			Schema:   getRefSchema("#/definitions/builder.TestInput"),
 		},
@@ -343,36 +320,20 @@ func getAdditionalTestParameters() []spec.Parameter {
 	ret := make([]spec.Parameter, 3)
 	ret[0] = spec.Parameter{
 		ParamProps: spec.ParamProps{
-			Name:     "body",
 			In:       "body",
+			Name:     "body",
 			Required: true,
 			Schema:   getRefSchema("#/definitions/builder.TestInput"),
 		},
 	}
 	ret[1] = spec.Parameter{
-		ParamProps: spec.ParamProps{
-			Name:        "fparam",
-			Description: "a test form parameter",
-			In:          "formData",
-		},
-		SimpleSchema: spec.SimpleSchema{
-			Type: "number",
-		},
-		CommonValidations: spec.CommonValidations{
-			UniqueItems: true,
+		Refable: spec.Refable{
+			Ref: spec.MustCreateRef("#/parameters/fparam-xCJg5kHS"),
 		},
 	}
 	ret[2] = spec.Parameter{
-		SimpleSchema: spec.SimpleSchema{
-			Type: "integer",
-		},
-		ParamProps: spec.ParamProps{
-			Description: "a test head parameter",
-			Name:        "hparam",
-			In:          "header",
-		},
-		CommonValidations: spec.CommonValidations{
-			UniqueItems: true,
+		Refable: spec.Refable{
+			Ref: spec.MustCreateRef("#/parameters/hparam-tx-jfxM1"),
 		},
 	}
 	return ret
@@ -469,21 +430,78 @@ func TestBuildOpenAPISpec(t *testing.T) {
 				"builder.TestInput":  getTestInputDefinition(),
 				"builder.TestOutput": getTestOutputDefinition(),
 			},
+			Parameters: map[string]spec.Parameter{
+				"fparam-xCJg5kHS": {
+					CommonValidations: spec.CommonValidations{
+						UniqueItems: true,
+					},
+					SimpleSchema: spec.SimpleSchema{
+						Type: "number",
+					},
+					ParamProps: spec.ParamProps{
+						In:          "formData",
+						Name:        "fparam",
+						Description: "a test form parameter",
+					},
+				},
+				"hparam-tx-jfxM1": {
+					CommonValidations: spec.CommonValidations{
+						UniqueItems: true,
+					},
+					SimpleSchema: spec.SimpleSchema{
+						Type: "integer",
+					},
+					ParamProps: spec.ParamProps{
+						In:          "header",
+						Name:        "hparam",
+						Description: "a test head parameter",
+					},
+				},
+				"path-z6Ciiujn": {
+					CommonValidations: spec.CommonValidations{
+						UniqueItems: true,
+					},
+					SimpleSchema: spec.SimpleSchema{
+						Type: "string",
+					},
+					ParamProps: spec.ParamProps{
+						In:          "path",
+						Name:        "path",
+						Description: "path to the resource",
+						Required:    true,
+					},
+				},
+				"pretty-nN7o5FEq": {
+					CommonValidations: spec.CommonValidations{
+						UniqueItems: true,
+					},
+					SimpleSchema: spec.SimpleSchema{
+						Type: "string",
+					},
+					ParamProps: spec.ParamProps{
+						In:          "query",
+						Name:        "pretty",
+						Description: "If 'true', then the output is pretty printed.",
+					},
+				},
+			},
 		},
 	}
 	swagger, err := BuildOpenAPISpec(container.RegisteredWebServices(), config)
 	if !assert.NoError(err) {
 		return
 	}
-	expected_json, err := json.Marshal(expected)
+	expected_json, err := expected.MarshalJSON()
 	if !assert.NoError(err) {
 		return
 	}
-	actual_json, err := json.Marshal(swagger)
+	actual_json, err := swagger.MarshalJSON()
 	if !assert.NoError(err) {
 		return
 	}
-	assert.Equal(string(expected_json), string(actual_json))
+	if err := jsontesting.JsonCompare(expected_json, actual_json); err != nil {
+		t.Error(err)
+	}
 }
 
 func TestBuildOpenAPIDefinitionsForResource(t *testing.T) {
@@ -503,7 +521,9 @@ func TestBuildOpenAPIDefinitionsForResource(t *testing.T) {
 	if !assert.NoError(err) {
 		return
 	}
-	assert.Equal(string(expected_json), string(actual_json))
+	if err := jsontesting.JsonCompare(expected_json, actual_json); err != nil {
+		t.Error(err)
+	}
 }
 
 func TestBuildOpenAPIDefinitionsForResourceWithExtensionV2Schema(t *testing.T) {

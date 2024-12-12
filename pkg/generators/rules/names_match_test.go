@@ -20,10 +20,43 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/types"
 )
 
 func TestNamesMatch(t *testing.T) {
+	someStruct := &types.Type{
+		Name: types.Name{Name: "SomeStruct"},
+		Kind: types.Struct,
+	}
+	someStructPtr := &types.Type{
+		Name: types.Name{Name: "SomeStructPtr"},
+		Kind: types.Pointer,
+		Elem: someStruct,
+	}
+	intPtr := &types.Type{
+		Name: types.Name{Name: "IntPtr"},
+		Kind: types.Pointer,
+		Elem: types.Int,
+	}
+	listMeta := &types.Type{
+		Name: types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListMeta"},
+		Kind: types.Struct,
+	}
+	listMetaPtr := &types.Type{
+		Name: types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListMetaPtr"},
+		Kind: types.Pointer,
+		Elem: listMeta,
+	}
+	objectMeta := &types.Type{
+		Name: types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ObjectMeta"},
+		Kind: types.Struct,
+	}
+	objectMetaPtr := &types.Type{
+		Name: types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ObjectMetaPtr"},
+		Kind: types.Pointer,
+		Elem: objectMeta,
+	}
+
 	tcs := []struct {
 		// name of test case
 		name string
@@ -39,7 +72,7 @@ func TestNamesMatch(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "PodSpec",
 						Tags: `json:"podSpec"`,
 					},
@@ -53,7 +86,7 @@ func TestNamesMatch(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "PodSpec",
 						Tags: `json:"podSpec,omitempty"`,
 					},
@@ -67,7 +100,7 @@ func TestNamesMatch(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "PodSpec",
 						Tags: `json:"podSpec,omitempty" protobuf:"bytes,1,opt,name=podSpec"`,
 					},
@@ -81,7 +114,7 @@ func TestNamesMatch(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "",
 						Tags: `json:"podSpec"`,
 					},
@@ -95,7 +128,7 @@ func TestNamesMatch(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "PodSpec",
 						Tags: `json:"PodSpec"`,
 					},
@@ -109,7 +142,7 @@ func TestNamesMatch(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "podSpec",
 						Tags: `json:"podSpec"`,
 					},
@@ -123,7 +156,7 @@ func TestNamesMatch(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "PodSpec",
 						Tags: `json:"spec"`,
 					},
@@ -137,7 +170,7 @@ func TestNamesMatch(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "Spec",
 						Tags: `json:"podSpec"`,
 					},
@@ -151,7 +184,7 @@ func TestNamesMatch(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "JSONSpec",
 						Tags: `json:"jsonSpec"`,
 					},
@@ -165,7 +198,7 @@ func TestNamesMatch(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "JSONSpec",
 						Tags: `json:"jsonspec"`,
 					},
@@ -179,7 +212,7 @@ func TestNamesMatch(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "HTTPJSONSpec",
 						Tags: `json:"httpJSONSpec"`,
 					},
@@ -195,7 +228,7 @@ func TestNamesMatch(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "HTTPJSONSpec",
 						Tags: `json:"httpjsonSpec"`,
 					},
@@ -209,7 +242,7 @@ func TestNamesMatch(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "podSpec",
 						Tags: `json:"-"`,
 					},
@@ -223,7 +256,7 @@ func TestNamesMatch(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "PodSpec",
 						Tags: `json:"-,"`,
 					},
@@ -231,48 +264,19 @@ func TestNamesMatch(t *testing.T) {
 			},
 			expected: []string{"PodSpec"},
 		},
-		// NOTE: JSON names in jsonNameBlacklist should skip evaluation
-		// {"", "", true},
-		{
-			name: "unspecified",
-			t: &types.Type{
-				Kind: types.Struct,
-				Members: []types.Member{
-					types.Member{
-						Name: "",
-						Tags: `json:""`,
-					},
-				},
-			},
-			expected: []string{},
-		},
-		// {"podSpec", "", true},
-		{
-			name: "blacklist_empty",
-			t: &types.Type{
-				Kind: types.Struct,
-				Members: []types.Member{
-					types.Member{
-						Name: "podSpec",
-						Tags: `json:""`,
-					},
-				},
-			},
-			expected: []string{},
-		},
-		// {"podSpec", "metadata", true},
+		// {"podSpec", "metadata", false},
 		{
 			name: "blacklist_metadata",
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "podSpec",
 						Tags: `json:"metadata"`,
 					},
 				},
 			},
-			expected: []string{},
+			expected: []string{"podSpec"},
 		},
 		{
 			name: "non_struct",
@@ -286,7 +290,7 @@ func TestNamesMatch(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "PodSpec",
 						Tags: `podSpec`,
 					},
@@ -301,7 +305,7 @@ func TestNamesMatch(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "S",
 						Tags: `json:"s"`,
 					},
@@ -316,7 +320,7 @@ func TestNamesMatch(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "Pod-Spec",
 						Tags: `json:"pod-Spec"`,
 					},
@@ -330,13 +334,99 @@ func TestNamesMatch(t *testing.T) {
 			t: &types.Type{
 				Kind: types.Struct,
 				Members: []types.Member{
-					types.Member{
+					{
 						Name: "Pod_Spec",
 						Tags: `json:"pod_Spec"`,
 					},
 				},
 			},
 			expected: []string{"Pod_Spec"},
+		},
+		{
+			name: "empty_JSON_name",
+			t: &types.Type{
+				Kind: types.Struct,
+				Members: []types.Member{
+					{
+						Name: "Int",
+						Tags: `json:""`, // Not okay!
+						Type: types.Int,
+					},
+					{
+						Name: "Struct",
+						Tags: `json:""`, // Okay, inlined.
+						Type: someStruct,
+					},
+					{
+						Name: "IntPtr",
+						Tags: `json:""`, // Not okay!
+						Type: intPtr,
+					},
+					{
+						Name: "StructPtr",
+						Tags: `json:""`, // Okay, inlined.
+						Type: someStructPtr,
+					},
+				},
+			},
+			expected: []string{
+				"Int",
+				"IntPtr",
+			},
+		},
+		{
+			name: "metadata_no_pointers",
+			t: &types.Type{
+				Kind: types.Struct,
+				Members: []types.Member{
+					{
+						Name: "ListMeta",
+						Tags: `json:"listMeta"`, // Not okay, should be "metadata"!
+						Type: listMeta,
+					},
+					{
+						Name: "ObjectMeta",
+						Tags: `json:"objectMeta"`, // Not okay, should be metadata"!
+						Type: objectMeta,
+					},
+					{
+						Name: "SomeStruct",
+						Tags: `json:"metadata"`, // Not okay, name mismatch!
+						Type: someStruct,
+					},
+				},
+			},
+			expected: []string{
+				"ListMeta",
+				"ObjectMeta",
+				"SomeStruct",
+			},
+		},
+		{
+			name: "metadata_pointers",
+			t: &types.Type{
+				Kind: types.Struct,
+				Members: []types.Member{
+					{
+						Name: "ListMeta",
+						Tags: `json:"listMeta"`, // Okay, convention only applies to struct.
+						Type: listMetaPtr,
+					},
+					{
+						Name: "ObjectMeta",
+						Tags: `json:"objectMeta"`, // Okay, convention only applies to struct.
+						Type: objectMetaPtr,
+					},
+					{
+						Name: "SomeStruct",
+						Tags: `json:"metadata"`, // Not okay, name mismatch!
+						Type: someStructPtr,
+					},
+				},
+			},
+			expected: []string{
+				"SomeStruct",
+			},
 		},
 	}
 

@@ -19,7 +19,8 @@ package proto_test
 import (
 	"path/filepath"
 
-	. "github.com/onsi/ginkgo"
+	openapi_v3 "github.com/google/gnostic-models/openapiv3"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/kube-openapi/pkg/util/proto"
@@ -28,6 +29,7 @@ import (
 
 var fakeSchema = testing.Fake{Path: filepath.Join("testdata", "swagger.json")}
 var fakeSchemaNext = testing.Fake{Path: filepath.Join("testdata", "swagger_next.json")}
+var fakeSchemaV300 = testing.FakeV3{Path: filepath.Join("testdata", "openapi_v3_0_0")}
 
 var _ = Describe("Reading apps/v1beta1/Deployment from v1.8 openAPIData", func() {
 	var models proto.Models
@@ -261,5 +263,176 @@ var _ = Describe("Path", func() {
 		field := array.FieldPath("subKey")
 
 		Expect(field.Get()).To(Equal([]string{"key", "[12]", ".subKey"}))
+	})
+})
+
+var _ = Describe("Reading apps/v1/Deployment from v3.0.0 openAPIData", func() {
+	var deployment *proto.Kind
+	BeforeEach(func() {
+		var models proto.Models
+		s, schemaErr := fakeSchemaV300.OpenAPIV3Schema("apps/v1")
+		models, modelsErr := proto.NewOpenAPIV3Data(s)
+
+		Expect(schemaErr).To(BeNil())
+		Expect(modelsErr).To(BeNil())
+
+		model := "io.k8s.api.apps.v1.Deployment"
+		schema := models.LookupModel(model)
+		Expect(schema).ToNot(BeNil())
+
+		deployment = schema.(*proto.Kind)
+		Expect(deployment).ToNot(BeNil())
+	})
+
+	It("should have a path", func() {
+		Expect(deployment.GetPath().Get()).To(Equal([]string{"io.k8s.api.apps.v1.Deployment"}))
+	})
+
+	It("should have a kind key of type string", func() {
+		Expect(deployment.Fields).To(HaveKey("kind"))
+		key := deployment.Fields["kind"].(*proto.Primitive)
+		Expect(key).ToNot(BeNil())
+		Expect(key.Type).To(Equal("string"))
+		Expect(key.GetPath().Get()).To(Equal([]string{"io.k8s.api.apps.v1.Deployment", ".kind"}))
+	})
+
+	It("should have a apiVersion key of type string", func() {
+		Expect(deployment.Fields).To(HaveKey("apiVersion"))
+		key := deployment.Fields["apiVersion"].(*proto.Primitive)
+		Expect(key).ToNot(BeNil())
+		Expect(key.Type).To(Equal("string"))
+		Expect(key.GetPath().Get()).To(Equal([]string{"io.k8s.api.apps.v1.Deployment", ".apiVersion"}))
+	})
+
+	It("should have a metadata key of type Reference", func() {
+		Expect(deployment.Fields).To(HaveKey("metadata"))
+		key := deployment.Fields["metadata"].(proto.Reference)
+		Expect(key).ToNot(BeNil())
+		Expect(key.Reference()).To(Equal("io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"))
+		subSchema := key.SubSchema().(*proto.Kind)
+		Expect(subSchema).ToNot(BeNil())
+	})
+
+	Describe("status", func() {
+		var status *proto.Kind
+		BeforeEach(func() {
+			Expect(deployment.Fields).To(HaveKey("status"))
+			key := deployment.Fields["status"].(proto.Reference)
+			Expect(key).ToNot(BeNil())
+			Expect(key.Reference()).To(Equal("io.k8s.api.apps.v1.DeploymentStatus"))
+			status = key.SubSchema().(*proto.Kind)
+			Expect(status).ToNot(BeNil())
+		})
+
+		It("should have a valid DeploymentStatus", func() {
+			By("having availableReplicas key")
+			Expect(status.Fields).To(HaveKey("availableReplicas"))
+			replicas := status.Fields["availableReplicas"].(*proto.Primitive)
+			Expect(replicas).ToNot(BeNil())
+			Expect(replicas.Type).To(Equal("integer"))
+
+			By("having conditions key")
+			Expect(status.Fields).To(HaveKey("conditions"))
+			conditions := status.Fields["conditions"].(*proto.Array)
+			Expect(conditions).ToNot(BeNil())
+			Expect(conditions.GetName()).To(Equal(`Array of Reference to "io.k8s.api.apps.v1.DeploymentCondition"`))
+			Expect(conditions.GetExtensions()).To(Equal(map[string]interface{}{
+				"x-kubernetes-patch-merge-key": "type",
+				"x-kubernetes-patch-strategy":  "merge",
+			}))
+			condition := conditions.SubType.(proto.Reference)
+			Expect(condition.Reference()).To(Equal("io.k8s.api.apps.v1.DeploymentCondition"))
+		})
+	})
+
+	Describe("spec subschema", func() {
+		var spec *proto.Kind
+		BeforeEach(func() {
+			Expect(deployment.Fields).To(HaveKey("spec"))
+			key, _ := deployment.Fields["spec"].(proto.Reference)
+			Expect(key).ToNot(BeNil())
+			Expect(key.Reference()).To(Equal("io.k8s.api.apps.v1.DeploymentSpec"))
+			spec = key.SubSchema().(*proto.Kind)
+			Expect(spec).ToNot(BeNil())
+		})
+
+		It("should have a spec with no gvk", func() {
+			_, found := spec.GetExtensions()["x-kubernetes-group-version-kind"]
+			Expect(found).To(BeFalse())
+		})
+
+		It("should have a spec with a PodTemplateSpec sub-field", func() {
+			Expect(spec.Fields).To(HaveKey("template"))
+			key := spec.Fields["template"].(proto.Reference)
+			Expect(key).ToNot(BeNil())
+			Expect(key.Reference()).To(Equal("io.k8s.api.core.v1.PodTemplateSpec"))
+		})
+	})
+})
+
+var _ = Describe("Reading v3 OpenAPI spec with x-kubernetes-group-version-kind", func() {
+	spec := []byte(`{
+	"openapi": "3.0.0",
+	"info": {
+		"title": "Kubernetes",
+		"version": "v1.24.0"
+	},
+	"paths": {
+		"/foo": {
+			"get": {
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Foo"
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	"components": {
+		"schemas": {
+			"Foo": {
+				"type": "object",
+				"properties": {},
+				"x-kubernetes-group-version-kind": [
+					{
+						"group": "foo",
+						"kind": "Foo",
+						"version": "v1"
+					}
+				]
+			}
+		}
+	}
+}`)
+	var schema proto.Schema
+
+	BeforeEach(func() {
+		document, err := openapi_v3.ParseDocument(spec)
+		Expect(err).To(BeNil())
+
+		models, modelsErr := proto.NewOpenAPIV3Data(document)
+		Expect(modelsErr).To(BeNil())
+
+		model := "Foo"
+		schema = models.LookupModel(model)
+		Expect(schema).ToNot(BeNil())
+	})
+
+	It("should have an extension with gvk", func() {
+		_, found := schema.GetExtensions()["x-kubernetes-group-version-kind"]
+		Expect(found).To(BeTrue())
+	})
+
+	It("should convert to proto.Kind type", func() {
+		foo, ok := schema.(*proto.Kind)
+		Expect(ok).To(BeTrue())
+		Expect(foo).ToNot(BeNil())
 	})
 })

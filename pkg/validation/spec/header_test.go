@@ -16,9 +16,13 @@ package spec
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	jsontesting "k8s.io/kube-openapi/pkg/util/jsontesting"
 )
 
 func float64Ptr(f float64) *float64 {
@@ -80,11 +84,78 @@ const headerJSON = `{
   "default": "8"
 }`
 
+// cmp.Diff panics when reflecting unexported fields under jsonreference.Ref
+// a custom comparator is required
+var swaggerDiffOptions = []cmp.Option{cmp.Comparer(func(a Ref, b Ref) bool {
+	return a.String() == b.String()
+})}
+
 func TestIntegrationHeader(t *testing.T) {
 	var actual Header
 	if assert.NoError(t, json.Unmarshal([]byte(headerJSON), &actual)) {
-		assert.EqualValues(t, actual, header)
+		if !reflect.DeepEqual(header, actual) {
+			t.Fatal(cmp.Diff(header, actual, swaggerDiffOptions...))
+		}
 	}
 
 	assertParsesJSON(t, headerJSON, header)
+}
+
+// Makes sure that a Header unmarshaled from known good JSON, and one unmarshaled
+// from generated JSON are equivalent.
+func TestHeaderSerialization(t *testing.T) {
+	generatedJSON, err := json.Marshal(header)
+	require.NoError(t, err)
+
+	generatedJSONActual := Header{}
+	require.NoError(t, json.Unmarshal(generatedJSON, &generatedJSONActual))
+	if !reflect.DeepEqual(header, generatedJSONActual) {
+		t.Fatal(cmp.Diff(header, generatedJSONActual, swaggerDiffOptions...))
+	}
+
+	goodJSONActual := Header{}
+	require.NoError(t, json.Unmarshal([]byte(headerJSON), &goodJSONActual))
+	if !reflect.DeepEqual(header, goodJSONActual) {
+		t.Fatal(cmp.Diff(header, goodJSONActual, swaggerDiffOptions...))
+	}
+}
+
+func TestHeaderRoundTrip(t *testing.T) {
+	cases := []jsontesting.RoundTripTestCase{
+		{
+			// Show at least one field from each embededd struct sitll allows
+			// roundtrips successfully
+			Name: "UnmarshalEmbedded",
+			JSON: `{
+				"pattern": "x-^",
+				"type": "string",
+				"x-framework": "swagger-go",
+				"description": "the description of this header"
+			  }`,
+			Object: &Header{
+				CommonValidations{
+					Pattern: "x-^",
+				},
+				SimpleSchema{
+					Type: "string",
+				},
+				VendorExtensible{Extensions{
+					"x-framework": "swagger-go",
+				}},
+				HeaderProps{
+					Description: "the description of this header",
+				},
+			},
+		}, {
+			Name:   "BasicCase",
+			JSON:   headerJSON,
+			Object: &header,
+		},
+	}
+
+	for _, tcase := range cases {
+		t.Run(tcase.Name, func(t *testing.T) {
+			require.NoError(t, tcase.RoundTripTest(&Header{}))
+		})
+	}
 }

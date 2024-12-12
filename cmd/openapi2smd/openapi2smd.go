@@ -17,12 +17,12 @@ limitations under the License.
 package main
 
 import (
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 
-	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
-	yaml "gopkg.in/yaml.v2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
+	yaml "sigs.k8s.io/yaml/goyaml.v2"
 
 	"k8s.io/kube-openapi/pkg/schemaconv"
 	"k8s.io/kube-openapi/pkg/util/proto"
@@ -33,7 +33,7 @@ func main() {
 		log.Fatal("this program takes input on stdin and writes output to stdout.")
 	}
 
-	input, err := ioutil.ReadAll(os.Stdin)
+	input, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		log.Fatalf("error reading stdin: %v", err)
 	}
